@@ -35,8 +35,5 @@ In your Conda environment, and in the nanopore-transcriptome-analysis directory,
     snakemake -j 1 all
 ```
 
-The pipeline is based on the **`ont_tutorial_pinfish`**.
-<<<<<<< HEAD
-=======
+The pipeline is based on the **ont_tutorial_pinfish**.
 
->>>>>>> 89239797a0a17da88bfffc56b68390fabd4a0a53
