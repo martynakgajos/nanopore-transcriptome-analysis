@@ -45,7 +45,7 @@ minimum_mapping_quality: 10
 spliced_bam2gff_opts: "-s"  # required for stranded data e.g. when pychopper filtered
 
 # -c parameter:
-minimum_cluster_size: 1
+minimum_cluster_size: 3
 
 # -p parameter:
 minimum_isoform_percent: 0.0

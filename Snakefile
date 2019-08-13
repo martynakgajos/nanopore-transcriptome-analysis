@@ -27,7 +27,7 @@ rule SpliceJunctionIndex:
     output:
         junc_bed = "ReferenceData/junctions.bed"
     shell:
-        "paftools.js gff2bed -j {output.junc_bed} {input}"
+        "paftools.js gff2bed {input} > {output.junc_bed}"
 
 # build minimap2 index
 rule Minimap2Index:
@@ -68,7 +68,8 @@ rule Pychopper:
 rule Minimap2: ## map reads using minimap2
     input:
        index = rules.Minimap2Index.output.index,
-       fastq = expand("Results/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("RawData/{sample}.fastq", sample=SAMPLES)
+       fastq = expand("Results/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("RawData/{sample}.fastq", sample=SAMPLES),
+       use_junc = rules.SpliceJunctionIndex.output.junc_bed if config["minimap2_opts_junction"] else ""
     output:
        bam = "Results/Minimap2/merged.mapping.bam"
     params:
@@ -76,7 +77,7 @@ rule Minimap2: ## map reads using minimap2
         min_mq = config["minimum_mapping_quality"],
     threads: config["threads"]
     shell:"""
-    minimap2 -t {threads} -ax splice {params.opts} {input.index} {input.fastq}\
+    minimap2 -t {threads} -ax splice {params.opts} --junc-bed {input.use_junc} {input.index} {input.fastq}\
     | samtools view -q {params.min_mq} -F 2304 -Sb | samtools sort -@ {threads} - -o {output.bam};
     samtools index {output.bam}
     """
