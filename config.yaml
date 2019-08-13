@@ -7,29 +7,32 @@ pipeline: "nanopore-transcriptome-analyze"
 repo: "https://github.com/martynakgajos/nanopore-transcriptome-analysis"
 
 ## Pipeline-specific parameters
-threads: 16
-pychopper: TRUE
 
 # Input genome:
 genome_fasta: "GRCh38.p12.primary_assembly.genome.fa"
 genome_annot: "gencode.v29.annotation.gtf"
 # genome_fasta and genome_annot must be a filename corresponding to file that has been placed in the ReferenceData folder
 
+# samples with .fastq extenssion must be placed in the RawData folder
 samples:
     OJ32: "day_5"
     OJ33: "day_0"
     OJ34: "day_3"
 
+threads: 16
+
+pychopper: TRUE
+
 # Use annotation to improve splice junction mapping (minimap2 --junc_bed parameter)
 minimap2_opts_junction: TRUE
 
-#minimum read quality to keep
+# Minimum read quality to keep:
 min_mean_q: 5
 
-#stringency of porechop heuristic:
+# Stringency of porechop heuristic:
 porechop_heu_stringency: 0.25
 
-# options passed to minimap2 during indexing:
+# Options passed to minimap2 during indexing:
 minimap_index_opts: "-k14"
 
 # Extra options passed to minimap2:
@@ -68,6 +71,3 @@ collapse_five_tol: 500
 
 # Three prime boundary tolerance:
 collapse_three_tol: 50
-
-## General pipeline parameters:
-tutorialText: FALSE
