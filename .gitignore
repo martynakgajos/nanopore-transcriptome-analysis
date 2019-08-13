@@ -1,0 +1,4 @@
+ReferenceData/*.fa
+ReferenceData/*.fai
+ReferenceData/*gtf
+src/*

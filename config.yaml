@@ -1,0 +1,70 @@
+---
+## General pipeline parameters:
+
+# Name of the pipeline:
+pipeline: "nanopore-transcriptome-analyze"
+# Repository URL:
+repo: ""
+
+## Pipeline-specific parameters
+threads: 16
+pychopper: TRUE
+
+# Input genome:
+genome_fasta: "GRCh38.p12.primary_assembly.genome.fa"
+genome_annot: "gencode.v29.annotation.gtf"
+# genome_fasta and genome_annot must be a filename corresponding to file that has been placed in the ReferenceData folder
+
+samples:
+    OJ32: "day_5"
+    OJ33: "day_0"
+    OJ34: "day_3"
+
+#minimum read quality to keep
+min_mean_q: 5
+
+#stringency of porechop heuristic:
+porechop_heu_stringency: 0.25
+
+# options passed to minimap2 during indexing:
+minimap_index_opts: "-k14"
+
+# Extra options passed to minimap2:
+minimap2_opts: "-uf"  # required for stranded data e.g. when pychopper filtered
+
+# Minmum mapping quality:
+minimum_mapping_quality: 10
+
+# Options passed to spliced_bam2gff:
+spliced_bam2gff_opts: "-s"  # required for stranded data e.g. when pychopper filtered
+
+# -c parameter:
+minimum_cluster_size: 1
+
+# -p parameter:
+minimum_isoform_percent: 0.0
+
+# -d parameter:
+exon_boundary_tolerance: 10
+
+# -e parameter:
+terminal_exon_boundary_tolerance: 50
+
+# Extra options passed to minimap2 when mapping polished reads:
+minimap2_opts_polished: "-uf"   # required for stranded data e.g. when pychopper filtered
+
+# Options passed to spliced_bam2gff when converting alignments of polished reads:
+spliced_bam2gff_opts_pol: "-s"  # required for stranded data e.g. when pychopper filtered
+
+# Options passed to collapse_partials when collapsing fragmentation artifacts
+# Internal exon boundary tolerance:
+collapse_internal_tol: 5
+
+# Five prime boundary tolerance:
+collapse_five_tol: 500
+
+# Three prime boundary tolerance:
+collapse_three_tol: 50
+
+## General pipeline parameters:
+tutorialText: FALSE

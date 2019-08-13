@@ -1,0 +1,32 @@
+channels:
+  - bioconda
+  - conda-forge
+  - r
+  - sagrudd
+dependencies:
+  - git
+  - git-lfs
+  - snakemake-minimal =5.2.4
+  - python =3.6
+  - samtools
+  - minimap2
+  - r-essentials
+  - r =3.5.1
+  - rstudio
+  - nanopore-r-cdna-deseq2
+  - gffcompare
+  - gffread
+  - xorg-libxext
+  - xorg-libxtst
+  - racon
+  - r-pdftools
+  - parasail-python
+  - graphviz
+  - racon=1.3.2=h9b26653_1  # this is @sagrudd's version - clever SIMD instructions removed
+  - pinfish=190125=b6f3c06_3
+  - filtlong
+  - salmon
+  - r-minionqc
+  - pip:
+    - "--editable=git+https://github.com/nanoporetech/pychopper.git#egg=pychopper"
+    - "--editable=git+https://github.com/jason-weirather/AlignQC.git#egg=AlignQC"
