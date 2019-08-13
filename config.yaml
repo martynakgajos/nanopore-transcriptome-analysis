@@ -4,7 +4,7 @@
 # Name of the pipeline:
 pipeline: "nanopore-transcriptome-analyze"
 # Repository URL:
-repo: ""
+repo: "https://github.com/martynakgajos/nanopore-transcriptome-analysis"
 
 ## Pipeline-specific parameters
 threads: 16
