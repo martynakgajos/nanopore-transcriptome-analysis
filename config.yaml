@@ -20,6 +20,9 @@ samples:
     OJ33: "day_0"
     OJ34: "day_3"
 
+# Use annotation to improve splice junction mapping (minimap2 --junc_bed parameter)
+minimap2_opts_junction: TRUE
+
 #minimum read quality to keep
 min_mean_q: 5
 
