@@ -8,9 +8,9 @@ SAMPLES=config["samples"]
 
 rule all:
   input:
-    expand("Analysis/Quantification/{sample}/quant.sf", sample=SAMPLES),
-    "Analysis/Pinfish/clustered_transcripts_collapsed.gff",
-    "Analysis/GffCompare/nanopore.combined.gtf"
+    expand("Results/Salmon/{sample}/quant.sf", sample=SAMPLES),
+    "Results/Pinfish/clustered_transcripts_collapsed.gff",
+    "Results/GffCompare/nanopore.combined.gtf"
 
 rule dump_versions:
     output:
@@ -20,12 +20,21 @@ rule dump_versions:
     shell:
         "conda list > {output.ver}"
 
+# build known splice junction bed file
+rule SpliceJunctionIndex:
+    input:
+        "ReferenceData/"+GenomeGFF
+    output:
+        junc_bed = "ReferenceData/junctions.bed"
+    shell:
+        "paftools.js gff2bed -j {output.junc_bed} {input}"
+
 # build minimap2 index
 rule Minimap2Index:
     input:
         genome = "ReferenceData/"+ReferenceFasta
     output:
-        index = "Analysis/Minimap2/"+ReferenceFasta+".mmi"
+        index = "Results/Minimap2/"+ReferenceFasta+".mmi"
     params:
         opts = config["minimap_index_opts"]
     threads: config["threads"]
@@ -46,11 +55,11 @@ rule Pychopper:
   input:
     "FilteredData/{sample}.fastq"
   output:
-    pdf = "Analysis/Pychopper/{sample}.pychopper_report.pdf",
-    fastq = "Analysis/Pychopper/{sample}.pychop.fastq",
-    stats = "Analysis/Pychopper/{sample}.pychop.stats",
-    scores = "Analysis/Pychopper/{sample}.pychop.scores",
-    unclass = "Analysis/Pychopper/{sample}.unclassified.fastq",
+    pdf = "Results/Pychopper/{sample}.pychopper_report.pdf",
+    fastq = "Results/Pychopper/{sample}.pychop.fastq",
+    stats = "Results/Pychopper/{sample}.pychop.stats",
+    scores = "Results/Pychopper/{sample}.pychop.scores",
+    unclass = "Results/Pychopper/{sample}.unclassified.fastq",
   params:
     opts = config["porechop_heu_stringency"]
   run:
@@ -59,9 +68,9 @@ rule Pychopper:
 rule Minimap2: ## map reads using minimap2
     input:
        index = rules.Minimap2Index.output.index,
-       fastq = expand("Analysis/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("RawData/{sample}.fastq", sample=SAMPLES)
+       fastq = expand("Results/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("RawData/{sample}.fastq", sample=SAMPLES)
     output:
-       bam = "Analysis/Minimap2/merged.mapping.bam"
+       bam = "Results/Minimap2/merged.mapping.bam"
     params:
         opts = config["minimap2_opts"],
         min_mq = config["minimum_mapping_quality"],
@@ -76,7 +85,7 @@ rule PinfishRawBAM2GFF: ## convert BAM to GFF
     input:
         bam = rules.Minimap2.output.bam
     output:
-        raw_gff = "Analysis/Pinfish/raw_transcripts.gff"
+        raw_gff = "Results/Pinfish/raw_transcripts.gff"
     params:
         opts = config["spliced_bam2gff_opts"]
     threads: config["threads"]
@@ -88,8 +97,8 @@ rule PinfishClusterGFF: ## cluster transcripts in GFF
     input:
         raw_gff = rules.PinfishRawBAM2GFF.output.raw_gff
     output:
-        cls_gff = "Analysis/Pinfish/clustered_pol_trstranscripts.gff",
-        cls_tab = "Analysis/Pinfish/cluster_memberships.tsv",
+        cls_gff = "Results/Pinfish/clustered_pol_transcripts.gff",
+        cls_tab = "Results/Pinfish/cluster_memberships.tsv",
     params:
         c = config["minimum_cluster_size"],
         d = config["exon_boundary_tolerance"],
@@ -104,7 +113,7 @@ rule PinfishCollapseRawPartials: ## collapse clustered read artifacts
     input:
         cls_gff = rules.PinfishClusterGFF.output.cls_gff
     output:
-        cls_gff_col = "Analysis/Pinfish/clustered_transcripts_collapsed.gff"
+        cls_gff_col = "Results/Pinfish/clustered_transcripts_collapsed.gff"
     params:
         d = config["collapse_internal_tol"],
         e = config["collapse_three_tol"],
@@ -119,7 +128,7 @@ rule PinfishPolishClusters: ## polish read clusters
         cls_tab = rules.PinfishClusterGFF.output.cls_tab,
         bam = rules.Minimap2.output.bam
     output:
-        pol_trs = "Analysis/Pinfish/polished_transcripts.fas"
+        pol_trs = "Results/Pinfish/polished_transcripts.fas"
     params:
         c = config["minimum_cluster_size"]
     threads: config["threads"]
@@ -132,7 +141,7 @@ rule MinimapPolishedClusters: ## map polished transcripts to genome
        index = rules.Minimap2Index.output.index,
        fasta = rules.PinfishPolishClusters.output.pol_trs,
     output:
-       pol_bam = "Analysis/Minimap2/polished_reads_aln_sorted.bam"
+       pol_bam = "Results/Minimap2/polished_reads_aln_sorted.bam"
     params:
         extra = config["minimap2_opts_polished"]
     threads: config["threads"]
@@ -147,7 +156,7 @@ rule PinfishPolishedBAM2GFF: ## convert BAM of polished transcripts to GFF
     input:
         bam = rules.MinimapPolishedClusters.output.pol_bam
     output:
-        pol_gff = "Analysis/Pinfish/polished_transcripts.gff"
+        pol_gff = "Results/Pinfish/polished_transcripts.gff"
     params:
         extra = config["spliced_bam2gff_opts_pol"]
     threads: config["threads"]
@@ -159,7 +168,7 @@ rule PinfishCollapsePolishedPartials: ## collapse polished read artifacts
     input:
         pol_gff = rules.PinfishPolishedBAM2GFF.output.pol_gff
     output:
-        pol_gff_col = "Analysis/Pinfish/polished_transcripts_collapsed.gff"
+        pol_gff_col = "Results/Pinfish/polished_transcripts_collapsed.gff"
     params:
         d = config["collapse_internal_tol"],
         e = config["collapse_three_tol"],
@@ -173,7 +182,7 @@ rule PrepareCorrectedTranscriptomeFasta: ## Generate corrected transcriptome.
         genome = "ReferenceData/"+ReferenceFasta,
         gff = rules.PinfishCollapsePolishedPartials.output.pol_gff_col,
     output:
-        fasta = "Analysis/Pinfish/corrected_transcriptome_polished_collapsed.fas"
+        fasta = "Results/Pinfish/corrected_transcriptome_polished_collapsed.fas"
     shell:"""
     gffread -g {input.genome} -w {output.fasta} {input.gff}
     """
@@ -184,13 +193,13 @@ rule GffCompare:
         reference = "ReferenceData/"+GenomeGFF,
         exptgff = rules.PinfishCollapsePolishedPartials.output.pol_gff_col
     output:
-        "Analysis/GffCompare/nanopore.combined.gtf",
-        "Analysis/GffCompare/nanopore.loci",
-        "Analysis/GffCompare/nanopore.redundant.gtf",
-        "Analysis/GffCompare/nanopore.stats",
-        "Analysis/GffCompare/nanopore.tracking"
+        "Results/GffCompare/nanopore.combined.gtf",
+        "Results/GffCompare/nanopore.loci",
+        "Results/GffCompare/nanopore.redundant.gtf",
+        "Results/GffCompare/nanopore.stats",
+        "Results/GffCompare/nanopore.tracking"
     shell:
-        "gffcompare -r {input.reference} -R -M -C -K -o Analysis/GffCompare/nanopore {input.exptgff}"
+        "gffcompare -r {input.reference} -R -M -C -K -o Results/GffCompare/nanopore {input.exptgff}"
 
 #map to transcriptome
 rule Map2Transcriptome:
@@ -198,7 +207,7 @@ rule Map2Transcriptome:
        target = rules.PrepareCorrectedTranscriptomeFasta.output.fasta,
        fastq = "FilteredData/{sample}.fastq"
     output:
-       sam = "Analysis/Quantification/{sample}.sam"
+       sam = "Results/Quantification/{sample}.sam"
     threads: config["threads"]
     priority: 10
     shell:
@@ -207,10 +216,10 @@ rule Map2Transcriptome:
 rule SalmonQuantifyMapped:
     input:
         target = rules.PrepareCorrectedTranscriptomeFasta.output.fasta,
-        sam = "Analysis/Quantification/{sample}.sam"
+        sam = "Results/Quantification/{sample}.sam"
     output:
-        quant = "Analysis/Quantification/{sample}/quant.sf",
+        quant = "Results/Salmon/{sample}/quant.sf",
     log:
-        'Analysis/Quantification/{sample}.log'
+        'Results/Salmon/{sample}.log'
     shell:
-        "salmon quant -l U -a {input.sam} -t {input.target} -o Analysis/Quantification/{wildcards.sample} --noErrorModel --writeUnmappedNames > {log} "
+        "salmon quant -l U -a {input.sam} -t {input.target} -o Results/Quantification/{wildcards.sample} --noErrorModel --writeUnmappedNames > {log} "
