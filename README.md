@@ -5,12 +5,10 @@
 ```
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     bash Miniconda3-latest-Linux-x86_64.sh
-    bash
 ```
-2. Download the **nanopore-transcriptome-analysis** pipeline into a folder named `nanopore-transcriptome-analysis`.  <!--  This tutorial requires the **`git-lfs`** large file support capabilities which should be installed through **`conda`** first.     conda install -c conda-forge git-lfs
-    git lfs install --> 
-```
-    https://github.com/martynakgajos/nanopore-transcriptome-analysis.git nanopore-transcriptome-analysis
+2. Download the **nanopore-transcriptome-analysis** pipeline into a folder named `nanopore-transcriptome-analysis`.  <!--  This tutorial requires the **`git-lfs`** large file support capabilities which should be installed through **`conda`** first.     conda install -c conda-forge git-lfs --> 
+``` 
+    git clone https://github.com/martynakgajos/nanopore-transcriptome-analysis.git nanopore-transcriptome-analysis
 ```
 3. Change your working directory into the new `nanopore-transcriptome-analysis` folder
 ```
