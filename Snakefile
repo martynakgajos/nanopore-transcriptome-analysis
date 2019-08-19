@@ -1,16 +1,13 @@
-import os
-import re
 
-# assess the genome annotations ...
 ReferenceFasta = config["genome_fasta"]
 GenomeGFF  = config["genome_annot"]
 SAMPLES=config["samples"]
 
 rule all:
   input:
-    expand("Results/Salmon/{sample}/quant.sf", sample=SAMPLES),
+    "Results/Quantification/all_counts.txt",
+    expand("IGV/{sample}.genome.bam", sample=SAMPLES),
     "Results/Pinfish/clustered_transcripts_collapsed.gff",
-    "Results/GffCompare/nanopore.combined.gtf"
 
 rule dump_versions:
     output:
@@ -36,14 +33,14 @@ rule Minimap2Index:
     output:
         index = "Results/Minimap2/"+ReferenceFasta+".mmi"
     params:
-        opts = config["minimap_index_opts"]
+        opts = config["minimap2_index_opts"]
     threads: config["threads"]
     shell:
       "minimap2 -t {threads} {params.opts} -I 1000G -d {output.index} {input.genome}"
 
 rule FilterReads:
     input:
-        "RawData/{sample}.fastq"
+        lambda wildcards: "RawData/"+SAMPLES[wildcards.sample]+".fastq"
     output:
         "FilteredData/{sample}.fastq",
     params:
@@ -65,10 +62,10 @@ rule Pychopper:
   run:
     shell("cdna_classifier.py -b ReferenceData/cdna_barcodes.fas -x -r {output.pdf} -S {output.stats} -A {output.scores} -u {output.unclass} -l {params.opts} {input} {output.fastq}")
 
-rule Minimap2: ## map reads using minimap2
+rule Minimap2Pinfish: ## map reads using minimap2
     input:
        index = rules.Minimap2Index.output.index,
-       fastq = expand("Results/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("RawData/{sample}.fastq", sample=SAMPLES),
+       fastq = expand("Results/Pychopper/{sample}.pychop.fastq", sample=SAMPLES) if (config["pychopper"]==True) else expand("FilteredData/{sample}.fastq", sample=SAMPLES),
        use_junc = rules.SpliceJunctionIndex.output.junc_bed if config["minimap2_opts_junction"] else ""
     output:
        bam = "Results/Minimap2/merged.mapping.bam"
@@ -84,7 +81,7 @@ rule Minimap2: ## map reads using minimap2
 
 rule PinfishRawBAM2GFF: ## convert BAM to GFF
     input:
-        bam = rules.Minimap2.output.bam
+        bam = rules.Minimap2Pinfish.output.bam
     output:
         raw_gff = "Results/Pinfish/raw_transcripts.gff"
     params:
@@ -127,7 +124,7 @@ rule PinfishPolishClusters: ## polish read clusters
     input:
         cls_gff = rules.PinfishClusterGFF.output.cls_gff,
         cls_tab = rules.PinfishClusterGFF.output.cls_tab,
-        bam = rules.Minimap2.output.bam
+        bam = rules.Minimap2Pinfish.output.bam
     output:
         pol_trs = "Results/Pinfish/polished_transcripts.fas"
     params:
@@ -183,11 +180,19 @@ rule PrepareCorrectedTranscriptomeFasta: ## Generate corrected transcriptome.
         genome = "ReferenceData/"+ReferenceFasta,
         gff = rules.PinfishCollapsePolishedPartials.output.pol_gff_col,
     output:
-        fasta = "Results/Pinfish/corrected_transcriptome_polished_collapsed.fas"
-    shell:"""
-    gffread -g {input.genome} -w {output.fasta} {input.gff}
-    """
+        fasta = "Results/Pinfish/corrected_transcriptome_polished_collapsed.fas",
+    shell:
+        "gffread -g {input.genome} -w {output.fasta} {input.gff}"
 
+# build minimap2 index for transcriptome
+rule Transcriptome2Index:
+    input:
+        genome = rules.PrepareCorrectedTranscriptomeFasta.output.fasta
+    output:
+        index = "Results/Minimap2/Transcriptome.mmi"
+    threads: config["threads"]
+    shell:
+      "minimap2 -t {threads} -I 1000G -d {output.index} {input.genome}"
 
 rule GffCompare:
     input:
@@ -198,29 +203,108 @@ rule GffCompare:
         "Results/GffCompare/nanopore.loci",
         "Results/GffCompare/nanopore.redundant.gtf",
         "Results/GffCompare/nanopore.stats",
-        "Results/GffCompare/nanopore.tracking"
+        "Results/GffCompare/nanopore.tracking",
     shell:
-        "gffcompare -r {input.reference} -R -M -C -K -o Results/GffCompare/nanopore {input.exptgff}"
+        "gffcompare -r {input.reference} -R -A -K -o Results/GffCompare/nanopore {input.exptgff}"
+
+'''
+Does not work
+# build new splice junction bed file
+rule SpliceJunctionIndexTranscriptome:
+    input:
+        "Results/Pinfish/polished_transcripts_collapsed.gff"
+    output:
+        junc_gtf = "Results/Pinfish/polished_transcripts_collapsed.gtf",
+        junc_bed = "Results/Pinfish/junctions.bed"
+    shell:"""
+        gffread {input} -T -o {output.junc_gtf};
+        paftools.js gff2bed {output.junc_gtf} > {output.junc_bed}
+        """
+'''
+
+rule Minimap2Genome: ## map reads using minimap2
+    input:
+       index = rules.Minimap2Index.output.index,
+       fastq = "FilteredData/{sample}.fastq",
+       use_junc = rules.SpliceJunctionIndex.output.junc_bed if config["minimap2_opts_junction"] else ""
+    output:
+       bam = "IGV/{sample}.genome.bam"
+    params:
+        opts = config["minimap2_opts"],
+    threads: config["threads"]
+    shell:"""
+    minimap2 -t {threads} -ax splice {params.opts} --junc-bed {input.use_junc} {input.index} {input.fastq}\
+    | samtools view -F 260 -Sb | samtools sort -@ {threads} - -o {output.bam};
+    samtools index {output.bam}
+    """
 
 #map to transcriptome
 rule Map2Transcriptome:
     input:
-       target = rules.PrepareCorrectedTranscriptomeFasta.output.fasta,
+       index = rules.Transcriptome2Index.output.index,
        fastq = "FilteredData/{sample}.fastq"
     output:
-       sam = "Results/Quantification/{sample}.sam"
+       bam = "Results/Quantification/{sample}.bam",
+       sbam = "Results/Quantification/{sample}.sorted.bam"
     threads: config["threads"]
+    params:
+        msec = config["maximum_secondary"],
+        psec = config["secondary_score_ratio"]
     priority: 10
+    shell:"""
+        minimap2 -ax map-ont -t {threads} -p {params.psec} -N {params.msec} {input.index} {input.fastq} | samtools view -Sb > {output.bam};
+        samtools sort -@ {threads} {output.bam} -o {output.sbam};
+        samtools index {output.sbam};
+        """
+
+rule ExtractPrimaryMapping:
+    input:
+        "Results/Quantification/{sample}.sorted.bam"
+    output:
+        "IGV/{sample}.transcriptome.bam"
+    shell:"""
+        samtools view -b -F 260 {input} > {output};
+        samtools index {output}
+        """
+
+rule CountTranscripts:
+    input:
+        bam = "IGV/{sample}.transcriptome.bam"
+    output:
+        quant = "Results/Quantification/{sample}.counts"
+    shell:"""
+        echo -e "counts\ttranscript" > {output.quant};
+        samtools view {input.bam} | cut -f3 | uniq -c | grep -v "*" | sed -e 's/^[ \t]*//' | sed 's/ /\t/' >> {output.quant}
+        """
+
+rule CalculateTPM:
+    input:
+        annotation = "ReferenceData/"+GenomeGFF,
+        transcriptome = "Results/GffCompare/nanopore.combined.gtf",
+        counts = expand("Results/Quantification/{sample}.counts", sample=SAMPLES),
+    output:
+        counts = "Results/Quantification/all_counts.txt"
+    script:
+        "scripts/concatenateCounts.py"
+
+
+rule Nanocount:
+    input:
+        bam = "Results/Quantification/{sample}.bam"
+    output:
+        quant = "Results/Quantification/{sample}.nanocount"
     shell:
-      "minimap2 -a -t {threads} {input.target} {input.fastq} > {output.sam}"
+        "NanoCount -i {input.bam} -o {output.quant}"
+
 
 rule SalmonQuantifyMapped:
     input:
         target = rules.PrepareCorrectedTranscriptomeFasta.output.fasta,
-        sam = "Results/Quantification/{sample}.sam"
+        bam = "Results/Quantification/{sample}.bam"
     output:
-        quant = "Results/Salmon/{sample}/quant.sf",
-    log:
-        'Results/Salmon/{sample}.log'
+        quant = "Results/Salmon/{sample}/quant.sf"
+    params:
+        dir = "Results/Salmon/{sample}"
+    threads: config["threads"]
     shell:
-        "salmon quant -l U -a {input.sam} -t {input.target} -o Results/Quantification/{wildcards.sample} --noErrorModel --writeUnmappedNames > {log} "
+        "salmon quant --noErrorModel -p {threads} -l U -a {input.bam} -t {input.target} -o {params.dir}"
