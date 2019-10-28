@@ -7,7 +7,7 @@ l=[]
 for fn in snakemake.input[2:]:
     df=pd.read_csv(fn,delimiter='\t',usecols=[0,1],index_col=[1])
     df['counts']=df['counts']*1000000/df['counts'].sum()
-    df=df.rename(columns={'counts':fn.split('.')[0].split('/')[-1]})
+    df=df.rename(columns={'counts':fn.split('.counts')[0].split('/')[-1]})
     l.append(df)
 df=l[0]
 for i in range(1,len(l)):
@@ -38,6 +38,5 @@ with open(snakemake.input[0],'r') as af:
 d=pd.DataFrame(data=d,columns=['gene_name','gene_id'])
 
 df=df.merge(d,how='left',on='gene_name')
-print(df.columns)
 df=df.drop(columns=['info','type'])
 df.sort_index(1).to_csv(snakemake.output[0],index=False)

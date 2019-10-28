@@ -60,7 +60,7 @@ rule Pychopper:
   params:
     opts = config["porechop_heu_stringency"]
   run:
-    shell("cdna_classifier.py -b ReferenceData/cdna_barcodes.fas -x -r {output.pdf} -S {output.stats} -A {output.scores} -u {output.unclass} -l {params.opts} {input} {output.fastq}")
+    shell("cdna_classifier.py -x True -b ReferenceData/cdna_barcodes.fas -r {output.pdf} -S {output.stats} -A {output.scores} -u {output.unclass} -l {params.opts} {input} {output.fastq}")
 
 rule Minimap2Pinfish: ## map reads using minimap2
     input:
@@ -207,21 +207,6 @@ rule GffCompare:
     shell:
         "gffcompare -r {input.reference} -R -A -K -o Results/GffCompare/nanopore {input.exptgff}"
 
-'''
-Does not work
-# build new splice junction bed file
-rule SpliceJunctionIndexTranscriptome:
-    input:
-        "Results/Pinfish/polished_transcripts_collapsed.gff"
-    output:
-        junc_gtf = "Results/Pinfish/polished_transcripts_collapsed.gtf",
-        junc_bed = "Results/Pinfish/junctions.bed"
-    shell:"""
-        gffread {input} -T -o {output.junc_gtf};
-        paftools.js gff2bed {output.junc_gtf} > {output.junc_bed}
-        """
-'''
-
 rule Minimap2Genome: ## map reads using minimap2
     input:
        index = rules.Minimap2Index.output.index,
@@ -287,16 +272,6 @@ rule CalculateTPM:
     script:
         "scripts/concatenateCounts.py"
 
-
-rule Nanocount:
-    input:
-        bam = "Results/Quantification/{sample}.bam"
-    output:
-        quant = "Results/Quantification/{sample}.nanocount"
-    shell:
-        "NanoCount -i {input.bam} -o {output.quant}"
-
-
 rule SalmonQuantifyMapped:
     input:
         target = rules.PrepareCorrectedTranscriptomeFasta.output.fasta,
@@ -308,3 +283,28 @@ rule SalmonQuantifyMapped:
     threads: config["threads"]
     shell:
         "salmon quant --noErrorModel -p {threads} -l U -a {input.bam} -t {input.target} -o {params.dir}"
+
+rule SpliceJunction:
+    input:
+        "IGV/{sample}.genome.bam"
+    output:
+        "Results/Splicing/{sample}_junction.bed"
+    shell:
+        "regtools junctions extract -o {output} -s 0 {input}"
+
+rule Strandness:
+  input:
+    "FilteredData/{sample}.fastq"
+  output:
+    pdf = "Results/Strand/{sample}.pychopper_report.pdf",
+    fastq = "Results/Strand/{sample}.pychop.fastq",
+    stats = "Results/Strand/{sample}.pychop.stats",
+    scores = "Results/Strand/{sample}.pychop.scores",
+    unclass = "Results/Strand/{sample}.unclassified.fastq",
+  run:
+    shell("cdna_classifier.py -m edlib -b ReferenceData/cdna_barcodes.fas -r {output.pdf} -S {output.stats} -A {output.scores} -u {output.unclass} {input} {output.fastq}")
+
+rule CalculatePsi:
+    input:
+        expand("Results/Splicing/{sample}_junction.bed", sample=SAMPLES),
+        expand("Results/Strand/{sample}.pychopper_report.pdf", sample=SAMPLES)
